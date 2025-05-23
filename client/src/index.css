@@ -1,0 +1,176 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f2f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  max-width: 800px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.container {
+  padding: 20px;
+}
+
+h1, h2 {
+  text-align: center;
+  color: #333;
+}
+
+input[type="text"],
+input[type="password"],
+textarea {
+  width: calc(100% - 20px);
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.message-list {
+  height: 400px;
+  overflow-y: scroll;
+  border: 1px solid #eee;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
+
+.message-item {
+  margin-bottom: 8px;
+  padding: 5px;
+  border-bottom: 1px dashed #eee;
+}
+
+.message-item:last-child {
+  border-bottom: none;
+}
+
+.message-item strong {
+  color: #007bff;
+}
+
+.message-input-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.message-input-container input {
+  flex-grow: 1;
+  margin-bottom: 0;
+}
+
+.error {
+  color: red;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.success {
+  color: green;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.link-button {
+    background: none;
+    color: #007bff;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: center;
+    width: auto;
+    margin-top: 10px;
+}
+.link-button:hover {
+    text-decoration: underline;
+    background: none;
+}
+
+.message-item {
+  background-color: #e9ecef; /* Nền nhẹ cho tất cả tin nhắn */
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  max-width: 90%;
+  align-self: flex-start; /* Tin nhắn của người khác ở bên trái */
+  word-wrap: break-word; /* Ngắt chữ dài */
+}
+
+.message-list {
+    display: flex; /* Dùng flexbox để căn chỉnh tin nhắn */
+    flex-direction: column; /* Xếp chồng tin nhắn */
+    gap: 5px; /* Khoảng cách giữa các tin nhắn */
+    height: 400px;
+    overflow-y: scroll;
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+.my-message {
+  background-color: #d1e7dd; /* Nền xanh nhạt cho tin nhắn của tôi */
+  align-self: flex-end; /* Tin nhắn của tôi ở bên phải */
+  margin-left: auto; /* Đẩy tin nhắn của tôi sang phải */
+}
+
+.message-item strong {
+  color: #007bff;
+  margin-right: 5px;
+}
+
+.timestamp {
+  font-size: 0.75em;
+  color: #6c757d;
+  margin-right: 8px;
+}
+
+.typing-status {
+  font-size: 0.85em;
+  color: #007bff;
+  margin-top: -5px;
+  margin-bottom: 10px;
+  text-align: left;
+  padding-left: 10px;
+  font-style: italic;
+}
