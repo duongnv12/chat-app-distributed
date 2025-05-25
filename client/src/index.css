@@ -174,3 +174,70 @@ button:disabled {
   padding-left: 10px;
   font-style: italic;
 }
+
+
+/* Users Tab specific styles */
+.users-content {
+    padding-top: 10px;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+
+.search-box button {
+    width: auto;
+    padding: 10px 15px;
+    background-color: #17a2b8; /* Màu xanh ngọc cho nút search */
+}
+.search-box button:hover {
+    background-color: #138496;
+}
+
+.search-results ul {
+    list-style: none;
+    padding: 0;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-results li {
+    padding: 10px 15px;
+    border-bottom: 1px solid #f8f8f8;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #fff;
+    transition: background-color 0.2s ease;
+}
+
+.search-results li:last-child {
+    border-bottom: none;
+}
+
+.search-results li:hover {
+    background-color: #e9ecef;
+}
+
+.start-chat-btn {
+    background-color: #6c757d; /* Màu xám cho nút start chat */
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.start-chat-btn:hover {
+    background-color: #5a6268;
+}

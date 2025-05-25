@@ -1,10 +1,17 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-api-gateway-service/.env
-auth-service/.env
-chat-service/.env
-notification-service/.env
+services/api-gateway-service/.env
+services/auth-service/.env
+services/chat-service/.env
+services/notification-service/.env
+services/message-worker-service/.env
+services/message-worker-service/node_modules
+services/chat-service/node_modules
+services/auth-service/node_modules
+services/api-gateway-service/node_modules
+services/notification-service/node_modules
 # dependencies
 /node_modules
+services/node_modules
 /.pnp
 .pnp.js
 

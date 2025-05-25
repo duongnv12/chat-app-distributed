@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.6
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Tắt bảo mật để đơn giản hóa, CẦN BẬT TRONG MÔI TRƯỜNG PRODUCTION
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m # Cấu hình bộ nhớ cho Elasticsearch
+    ports:
+      - "9200:9200" # Cổng HTTP API
+      - "9300:9300" # Cổng giao tiếp node-to-node
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data # Lưu dữ liệu để không bị mất khi container dừng
+    ulimits: # Cấu hình giới hạn file cho Elasticsearch
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elk-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.6
+    container_name: logstash
+    ports:
+      - "5000:5000/tcp" # Cổng để nhận log từ các service (tcp input)
+      - "5000:5000/udp" # Cổng để nhận log từ các service (udp input, tùy chọn)
+      - "9600:9600" # Cổng API của Logstash
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro # Cấu hình Logstash
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro # Pipeline xử lý log
+    depends_on:
+      - elasticsearch
+    environment:
+      - LS_JAVA_OPTS=-Xms256m -Xmx256m # Cấu hình bộ nhớ cho Logstash
+    networks:
+      - elk-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.6
+    container_name: kibana
+    ports:
+      - "5601:5601" # Cổng giao diện Kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200 # Kibana kết nối đến Elasticsearch qua network nội bộ Docker
+    depends_on:
+      - elasticsearch
+    networks:
+      - elk-network
+
+volumes:
+  elasticsearch-data: # Định nghĩa Docker Volume để lưu trữ dữ liệu của Elasticsearch
+
+networks:
+  elk-network:
+    driver: bridge # Tạo một network riêng cho các service của ELK

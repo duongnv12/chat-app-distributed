@@ -1,0 +1,18 @@
+{
+  "name": "message-worker-service",
+  "version": "1.0.0",
+  "description": "A worker service to consume messages from RabbitMQ",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.4.5",
+    "winston": "^3.11.0",
+    "ws": "^8.18.2"
+  }
+}

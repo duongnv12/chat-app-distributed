@@ -5,10 +5,12 @@ import { io } from 'socket.io-client';
 import { jwtDecode } from 'jwt-decode';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import './App.css'; // Import CSS styles
 
 // Base URLs for your services
 const API_GATEWAY_URL = 'http://localhost:3000';
 const CHAT_SERVICE_WS_URL = 'http://localhost:3003';
+const WS_NOTIFICATION_URL = 'ws://localhost:4000'; 
 
 function App() {
     const [isRegistering, setIsRegistering] = useState(false);
@@ -24,10 +26,17 @@ function App() {
     const [currentRoom, setCurrentRoom] = useState('general');
     const [roomInput, setRoomInput] = useState('');
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+
     const [typingUsers, setTypingUsers] = useState(new Set()); // Set để lưu trữ các username đang gõ
     const typingTimeoutRef = useRef(null); // Ref để quản lý timeout của trạng thái gõ
 
     const messageListRef = useRef(null); // Ref để tự động cuộn
+
+    const notificationSocketRef = useRef(null);
+
 
     // Effect để tự động cuộn xuống dưới cùng khi có tin nhắn mới
     useEffect(() => {
@@ -88,12 +97,24 @@ function App() {
                 console.log('Received message:', msg);
                 setMessages((prevMessages) => {
                     if (msg.room === currentRoom) {
-                        // Khi nhận được tin nhắn, đảm bảo người gửi tin nhắn đó không còn trong danh sách gõ nữa
                         setTypingUsers(prev => {
                             const newSet = new Set(prev);
                             newSet.delete(msg.sender);
                             return newSet;
                         });
+                        // Chỉ hiện toast nếu không phải tin nhắn của chính mình và phòng hiện tại
+                        if (
+                            msg.sender !== loggedInUsername &&
+                            msg.room === currentRoom
+                        ) {
+                            const toastId = `msg-${msg.sender}-${msg.timestamp}`;
+                            if (!toast.isActive(toastId)) {
+                                toast.info(
+                                    `${msg.sender}: ${msg.content}`,
+                                    { autoClose: 3000, toastId }
+                                );
+                            }
+                        }
                         return [...prevMessages, msg];
                     }
                     return prevMessages;
@@ -165,6 +186,54 @@ function App() {
         }
     };
 
+    useEffect(() => {
+        // Kết nối tới Notification Service khi đã đăng nhập
+        if (token) {
+            const ws = new window.WebSocket(WS_NOTIFICATION_URL);
+            notificationSocketRef.current = ws;
+
+            ws.onopen = () => {
+                console.log('Connected to Notification Service');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'NEW_MESSAGE') {
+                        // Chỉ hiện toast nếu không phải tin nhắn của chính mình và phòng khác phòng hiện tại
+                        if (
+                            msg.data.room !== currentRoom &&
+                            msg.data.sender !== loggedInUsername
+                        ) {
+                            // Sử dụng toastId để tránh trùng
+                            const toastId = `msg-${msg.data.sender}-${msg.data.timestamp}`;
+                            if (!toast.isActive(toastId)) {
+                                toast.info(
+                                    `New message from ${msg.data.sender} in room "${msg.data.room}": ${msg.data.content}`,
+                                    { autoClose: 4000, toastId }
+                                );
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error parsing notification:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('Notification WebSocket closed');
+            };
+
+            ws.onerror = (err) => {
+                console.error('Notification WebSocket error:', err);
+            };
+
+            return () => {
+                ws.close();
+            };
+        }
+    }, [token, currentRoom]);
+
     const handleAuth = async (endpoint) => {
         try {
             const response = await axios.post(`${API_GATEWAY_URL}/auth/${endpoint}`, { username: usernameInput, password });
@@ -229,6 +298,37 @@ function App() {
         }
     };
 
+        // Hàm tìm kiếm người dùng
+    const handleSearchUser = async () => {
+        if (!searchTerm.trim()) return;
+        setSearchLoading(true);
+        try {
+            const response = await axios.get(
+                `${API_GATEWAY_URL}/auth/users/search?username=${encodeURIComponent(searchTerm)}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setSearchResults(response.data);
+        } catch (err) {
+            toast.error('Error searching users');
+            setSearchResults([]);
+        }
+        setSearchLoading(false);
+    };
+
+    // Hàm join phòng chat 1-1
+    const handleStartPrivateChat = (otherUser) => {
+        // Tạo tên phòng private theo thứ tự alphabet để 2 user luôn vào cùng 1 phòng
+        const users = [loggedInUsername, otherUser].sort();
+        const privateRoom = `private_${users[0]}_${users[1]}`;
+        setCurrentRoom(privateRoom);
+        if (socket && socket.connected) {
+            socket.emit('joinRoom', privateRoom);
+            setMessages([]);
+        }
+        setSearchResults([]);
+        setSearchTerm('');
+    };
+
     const handleLogout = () => {
         setToken('');
         localStorage.removeItem('jwtToken');
@@ -249,25 +349,27 @@ function App() {
         return (
             <div className="container">
                 <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
-                <h2>{isRegistering ? 'Register' : 'Login'}</h2>
-                <input
-                    type="text"
-                    placeholder="Username"
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                />
-                <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                />
-                <button onClick={isRegistering ? handleRegister : handleLogin}>
-                    {isRegistering ? 'Register' : 'Login'}
-                </button>
-                <button className="link-button" onClick={() => setIsRegistering(!isRegistering)}>
-                    {isRegistering ? 'Already have an account? Login' : 'Need an account? Register'}
-                </button>
+                <div className="main-chat" style={{ width: '100%' }}>
+                    <h2>{isRegistering ? 'Register' : 'Login'}</h2>
+                    <input
+                        type="text"
+                        placeholder="Username"
+                        value={usernameInput}
+                        onChange={(e) => setUsernameInput(e.target.value)}
+                    />
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button onClick={isRegistering ? handleRegister : handleLogin}>
+                        {isRegistering ? 'Register' : 'Login'}
+                    </button>
+                    <button className="link-button" onClick={() => setIsRegistering(!isRegistering)}>
+                        {isRegistering ? 'Already have an account? Login' : 'Need an account? Register'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -275,59 +377,98 @@ function App() {
     return (
         <div className="container">
             <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
-            <h2>Welcome, {loggedInUsername}!</h2>
-            <button onClick={handleLogout}>Logout</button>
-
-            <h3 style={{marginTop: '20px'}}>Current Room: {currentRoom} ({socketStatus})</h3>
-            <div className="message-input-container" style={{marginBottom: '10px'}}>
-                <input
-                    type="text"
-                    placeholder="Enter room name to join..."
-                    value={roomInput}
-                    onChange={(e) => setRoomInput(e.target.value)}
-                    onKeyPress={(e) => { if (e.key === 'Enter') handleJoinRoom(); }}
-                    disabled={!socket || !socket.connected}
-                />
-                <button onClick={handleJoinRoom} disabled={!socket || !socket.connected}>
-                    Join Room
-                </button>
+            {/* Sidebar bên trái */}
+            <div className="sidebar">
+                <div>
+                    <h3>Welcome, {loggedInUsername}!</h3>
+                    <button className="logout-button" onClick={handleLogout}>Logout</button>
+                </div>
+                {/* Tìm kiếm người dùng */}
+                <div className="search-box">
+                    <input
+                        type="text"
+                        placeholder="Search users..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        onKeyPress={e => { if (e.key === 'Enter') handleSearchUser(); }}
+                        disabled={searchLoading}
+                    />
+                    <button onClick={handleSearchUser} disabled={searchLoading}>
+                        {searchLoading ? '...' : 'Search'}
+                    </button>
+                </div>
+                {/* Hiển thị kết quả tìm kiếm */}
+                {searchResults.length > 0 && (
+                    <div className="search-results">
+                        <ul>
+                            {searchResults.map(user => (
+                                <li key={user._id}>
+                                    <span>{user.username}</span>
+                                    <button className="start-chat-btn" onClick={() => handleStartPrivateChat(user.username)}>
+                                        Chat
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                {/* Tham gia phòng */}
+                <div className="room-input-container">
+                    <input
+                        type="text"
+                        placeholder="Enter room name..."
+                        value={roomInput}
+                        onChange={(e) => setRoomInput(e.target.value)}
+                        onKeyPress={(e) => { if (e.key === 'Enter') handleJoinRoom(); }}
+                        disabled={!socket || !socket.connected}
+                    />
+                    <button onClick={handleJoinRoom} disabled={!socket || !socket.connected}>
+                        Join
+                    </button>
+                </div>
+                <div>
+                    <h3>Current Room</h3>
+                    <div style={{ color: '#6366f1', fontWeight: 600 }}>{currentRoom} <span style={{ color: '#64748b', fontWeight: 400 }}>({socketStatus})</span></div>
+                </div>
             </div>
-
-            <h3>Messages in "{currentRoom}"</h3>
-            {typingUsers.size > 0 && ( // Chỉ hiển thị nếu có người đang gõ
-                <p className="typing-status">
-                    {Array.from(typingUsers) // Chuyển Set thành Array để map
-                        .filter(user => user !== loggedInUsername) // Loại trừ chính người dùng hiện tại
-                        .join(', ')}{' '}
-                    {Array.from(typingUsers).filter(user => user !== loggedInUsername).length === 1 ? 'is' : 'are'} typing...
-                </p>
-            )}
-            <div className="message-list" ref={messageListRef}>
-                {messages.map((msg, index) => (
-                    <p
-                        key={index}
-                        className={`message-item ${msg.sender === loggedInUsername ? 'my-message' : ''}`}
-                    >
-                        <span className="timestamp">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
-                        <strong>{msg.sender}</strong>: {msg.content}
+            {/* Khu vực chat bên phải */}
+            <div className="main-chat">
+                <div className="header">
+                    <h2>Room: {currentRoom}</h2>
+                </div>
+                {typingUsers.size > 0 && (
+                    <p className="typing-status">
+                        {Array.from(typingUsers).filter(user => user !== loggedInUsername).join(', ')}{' '}
+                        {Array.from(typingUsers).filter(user => user !== loggedInUsername).length === 1 ? 'is' : 'are'} typing...
                     </p>
-                ))}
-            </div>
-            <div className="message-input-container">
-                <input
-                    type="text"
-                    placeholder="Type a message..."
-                    value={newMessage}
-                    onChange={(e) => {
-                        setNewMessage(e.target.value);
-                        handleTyping(); // GỌI HÀM TYPING KHI CÓ THAY ĐỔI
-                    }}
-                    onKeyPress={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
-                    disabled={!socket || !socket.connected}
-                />
-                <button onClick={handleSendMessage} disabled={!socket || !socket.connected}>
-                    Send
-                </button>
+                )}
+                <div className="message-list" ref={messageListRef}>
+                    {messages.map((msg, index) => (
+                        <p
+                            key={index}
+                            className={`message-item ${msg.sender === loggedInUsername ? 'my-message' : ''}`}
+                        >
+                            <span className="timestamp">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
+                            <strong>{msg.sender}</strong>: {msg.content}
+                        </p>
+                    ))}
+                </div>
+                <div className="message-input-container">
+                    <input
+                        type="text"
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => {
+                            setNewMessage(e.target.value);
+                            handleTyping();
+                        }}
+                        onKeyPress={(e) => { if (e.key === 'Enter') handleSendMessage(); }}
+                        disabled={!socket || !socket.connected}
+                    />
+                    <button onClick={handleSendMessage} disabled={!socket || !socket.connected}>
+                        Send
+                    </button>
+                </div>
             </div>
         </div>
     );

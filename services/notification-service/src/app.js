@@ -1,10 +1,23 @@
 // notification-service/src/app.js
 const express = require('express');
-const amqp = require('amqplib'); // Import amqplib
+const amqp = require('amqplib');
+const WebSocket = require('ws');
 
 const app = express();
-const PORT = process.env.PORT || 3004; // Cổng cho Notification Service (chọn cổng khác biệt)
+const PORT = process.env.PORT || 3004; // Cổng HTTP cho health check
+const WS_PORT = process.env.WS_PORT || 4000; // Cổng WebSocket cho client kết nối
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672';
+
+// Khởi tạo WebSocket server
+const wss = new WebSocket.Server({ port: WS_PORT });
+console.log(`[WebSocket] Notification WebSocket Server listening on port ${WS_PORT}`);
+
+wss.on('connection', (ws) => {
+    console.log('[WebSocket] Client connected');
+    ws.on('close', () => {
+        console.log('[WebSocket] Client disconnected');
+    });
+});
 
 // Hàm kết nối đến RabbitMQ và bắt đầu tiêu thụ tin nhắn
 async function consumeMessages() {
@@ -13,26 +26,30 @@ async function consumeMessages() {
         const channel = await connection.createChannel();
         console.log('[RabbitMQ] Connected to RabbitMQ from Notification Service');
 
-        // Khai báo hàng đợi (cần đảm bảo hàng đợi tồn tại)
-        // Cần 'durable: true' để đảm bảo nó khớp với hàng đợi đã tạo bởi Chat Service
+        // Khai báo hàng đợi
         await channel.assertQueue('chat_messages', { durable: true });
         console.log('[RabbitMQ] Asserted queue: chat_messages for consuming');
-
         console.log('[RabbitMQ] Waiting for messages in chat_messages. To exit, press CTRL+C');
 
-        // Bắt đầu tiêu thụ tin nhắn từ hàng đợi
-        // noAck: false => cần gửi xác nhận (ack) sau khi xử lý xong tin nhắn
         channel.consume('chat_messages', (msg) => {
             if (msg !== null) {
                 const content = msg.content.toString();
                 console.log(`[Notification Service] Received message: "${content}"`);
 
-                // Đây là nơi bạn sẽ thêm logic xử lý thông báo thực tế
-                // Ví dụ: gửi push notification tới người dùng, lưu vào DB, v.v.
+                // Broadcast tới tất cả client WebSocket
+                wss.clients.forEach((client) => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify({
+                            type: 'NEW_MESSAGE',
+                            data: JSON.parse(content)
+                        }));
+                    }
+                });
+
+                // Xử lý thông báo thực tế (nếu cần)
                 console.log(`[Notification Service] Processing notification for message: "${content}"`);
 
                 // Xác nhận đã xử lý tin nhắn
-                // Rất quan trọng: Nếu không có ack, tin nhắn sẽ không bị xóa khỏi hàng đợi
                 channel.ack(msg);
                 console.log(`[Notification Service] Acknowledged message: "${content}"`);
             }
@@ -40,7 +57,6 @@ async function consumeMessages() {
 
     } catch (error) {
         console.error('[RabbitMQ] Error connecting or consuming from RabbitMQ:', error.message);
-        // Tái kết nối nếu có lỗi
         setTimeout(consumeMessages, 5000);
     }
 }
@@ -53,7 +69,7 @@ app.get('/', (req, res) => {
     res.send('Notification Service is running and consuming messages.');
 });
 
-// Lắng nghe cổng HTTP (không liên quan đến việc tiêu thụ tin nhắn RabbitMQ)
+// Lắng nghe cổng HTTP (không liên quan đến WebSocket)
 app.listen(PORT, () => {
-    console.log(`Notification Service listening on port ${PORT}`);
+    console.log(`Notification Service HTTP listening on port ${PORT}`);
 });
